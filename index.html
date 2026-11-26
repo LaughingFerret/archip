@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Кубики D&D — бросай!</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: radial-gradient(circle at 50% 0%, #2a2d3a 0%, #15161c 70%);
+    color: #e5e7eb;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+    line-height: 1.5;
+  }
+
+  .app {
+    width: 100%;
+    max-width: 640px;
+  }
+
+  .app__title {
+    font-size: 26px;
+    font-weight: 800;
+    text-align: center;
+    letter-spacing: -0.02em;
+    background: linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    margin-bottom: 6px;
+  }
+
+  .app__subtitle {
+    text-align: center;
+    font-size: 14px;
+    color: #9ca3af;
+    margin-bottom: 28px;
+  }
+
+  /* Сетка выбора кубиков */
+  .dice-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  @media (max-width: 520px) {
+    .dice-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  .die-btn {
+    font-family: inherit;
+    position: relative;
+    background: #1f2330;
+    border: 2px solid #2f3547;
+    border-radius: 14px;
+    padding: 16px 8px 12px;
+    cursor: pointer;
+    color: #cbd5e1;
+    transition: border-color .15s ease, background .15s ease, transform .1s ease, box-shadow .15s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .die-btn:hover {
+    border-color: #4b5563;
+    background: #262b3a;
+  }
+
+  .die-btn:active { transform: scale(.97); }
+
+  .die-btn.active {
+    border-color: #f59e0b;
+    background: linear-gradient(180deg, #2e2718 0%, #1f2330 100%);
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, .2), 0 4px 16px rgba(245, 158, 11, .15);
+    color: #fef3c7;
+  }
+
+  .die-btn__icon {
+    font-size: 26px;
+    line-height: 1;
+    filter: grayscale(.3);
+  }
+
+  .die-btn.active .die-btn__icon { filter: none; }
+
+  .die-btn__label {
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .die-btn__faces {
+    font-size: 11px;
+    color: #6b7280;
+  }
+
+  .die-btn.active .die-btn__faces { color: #d97706; }
+
+  /* Панель броска */
+  .roll-panel {
+    background: #1a1d27;
+    border: 1px solid #2a2e3d;
+    border-radius: 18px;
+    padding: 24px;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+
+  .roll-panel__hint {
+    font-size: 13px;
+    color: #6b7280;
+    margin-bottom: 12px;
+  }
+
+  .roll-result {
+    font-size: 72px;
+    font-weight: 900;
+    line-height: 1;
+    color: #f59e0b;
+    text-shadow: 0 0 30px rgba(245, 158, 11, .35);
+    min-height: 76px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform .1s ease;
+  }
+
+  .roll-result.rolling {
+    animation: shake .1s linear infinite;
+    color: #9ca3af;
+    text-shadow: none;
+  }
+
+  @keyframes shake {
+    0%   { transform: translate(0, 0) rotate(0deg); }
+    25%  { transform: translate(-2px, 1px) rotate(-2deg); }
+    50%  { transform: translate(2px, -1px) rotate(2deg); }
+    75%  { transform: translate(-1px, -2px) rotate(-1deg); }
+    100% { transform: translate(1px, 2px) rotate(1deg); }
+  }
+
+  .roll-result.crit {
+    color: #22c55e;
+    text-shadow: 0 0 40px rgba(34, 197, 94, .5);
+    animation: pop .3s ease;
+  }
+
+  .roll-result.fail {
+    color: #ef4444;
+    text-shadow: 0 0 40px rgba(239, 68, 68, .5);
+    animation: pop .3s ease;
+  }
+
+  @keyframes pop {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.15); }
+    100% { transform: scale(1); }
+  }
+
+  .roll-detail {
+    font-size: 13px;
+    color: #9ca3af;
+    min-height: 20px;
+    margin-top: 4px;
+  }
+
+  .roll-detail b { color: #e5e7eb; }
+
+  .roll-btn {
+    font-family: inherit;
+    width: 100%;
+    margin-top: 18px;
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: .02em;
+    color: #1a1d27;
+    background: linear-gradient(180deg, #fbbf24 0%, #f59e0b 100%);
+    border: none;
+    border-radius: 12px;
+    padding: 14px 20px;
+    cursor: pointer;
+    transition: filter .15s ease, transform .1s ease, box-shadow .15s ease;
+    box-shadow: 0 4px 14px rgba(245, 158, 11, .3);
+  }
+
+  .roll-btn:hover { filter: brightness(1.07); box-shadow: 0 6px 20px rgba(245, 158, 11, .4); }
+  .roll-btn:active { transform: translateY(1px); }
+  .roll-btn:disabled { opacity: .5; cursor: wait; }
+  .roll-btn:focus-visible { outline: 3px solid rgba(245, 158, 11, .5); outline-offset: 2px; }
+
+  /* История */
+  .history {
+    background: #1a1d27;
+    border: 1px solid #2a2e3d;
+    border-radius: 18px;
+    padding: 18px 20px;
+  }
+
+  .history__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .history__title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #cbd5e1;
+  }
+
+  .history__clear {
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+    background: transparent;
+    border: 1px solid #2f3547;
+    border-radius: 8px;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: color .15s ease, border-color .15s ease;
+  }
+
+  .history__clear:hover { color: #e5e7eb; border-color: #4b5563; }
+
+  .history__list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .history__empty {
+    font-size: 13px;
+    color: #4b5563;
+    text-align: center;
+    padding: 10px 0;
+  }
+
+  .history__item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 13px;
+    padding: 7px 10px;
+    border-radius: 9px;
+    background: #212533;
+    animation: slideIn .2s ease;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .history__die {
+    font-weight: 700;
+    color: #9ca3af;
+    flex: 0 0 auto;
+  }
+
+  .history__value {
+    font-weight: 800;
+    color: #f59e0b;
+    margin-left: auto;
+  }
+
+  .history__value.crit { color: #22c55e; }
+  .history__value.fail { color: #ef4444; }
+
+  .history__time {
+    font-size: 11px;
+    color: #4b5563;
+    flex: 0 0 auto;
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <h1 class="app__title">Брось кубик</h1>
+  <p class="app__subtitle">Выбери кубик и нажми «Бросить»</p>
+
+  <!-- Выбор кубика -->
+  <div class="dice-grid" id="diceGrid"></div>
+
+  <!-- Панель броска -->
+  <div class="roll-panel">
+    <p class="roll-panel__hint" id="rollHint">Выбери кубик выше</p>
+    <div class="roll-result" id="rollResult">—</div>
+    <div class="roll-detail" id="rollDetail"></div>
+    <button class="roll-btn" id="rollBtn" disabled>Бросить</button>
+  </div>
+
+  <!-- История -->
+  <div class="history">
+    <div class="history__header">
+      <span class="history__title">История бросков</span>
+      <button class="history__clear" id="clearHistory">Очистить</button>
+    </div>
+    <div class="history__list" id="historyList">
+      <div class="history__empty">Пока пусто</div>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* ---------- Конфигурация кубиков ---------- */
+  const DICE = [
+    { id: 'd4',   label: 'd4',   faces: 4,   icon: '🔺' },
+    { id: 'd6',   label: 'd6',   faces: 6,   icon: '🎲' },
+    { id: 'd8',   label: 'd8',   faces: 8,   icon: '🔷' },
+    { id: 'd10',  label: 'd10',  faces: 10,  icon: '🔟' },
+    { id: 'd12',  label: 'd12',  faces: 12,  icon: '🟣' },
+    { id: 'd20',  label: 'd20',  faces: 20,  icon: '⭐' },
+    { id: 'd100', label: 'd100', faces: 100, icon: '💯' },
+    { id: 'd2',   label: 'd2',   faces: 2,   icon: '🪙' }
+  ];
+
+  /* ---------- Состояние ---------- */
+  let selectedDie = null;
+  let rolling = false;
+  const history = [];
+
+  /* ---------- DOM ---------- */
+  const diceGrid    = document.getElementById('diceGrid');
+  const rollHint    = document.getElementById('rollHint');
+  const rollResult  = document.getElementById('rollResult');
+  const rollDetail  = document.getElementById('rollDetail');
+  const rollBtn     = document.getElementById('rollBtn');
+  const historyList = document.getElementById('historyList');
+  const clearBtn    = document.getElementById('clearHistory');
+
+  /* ---------- Рендер кнопок кубиков ---------- */
+  function renderDiceButtons() {
+    diceGrid.innerHTML = DICE.map(die => `
+      <button type="button" class="die-btn" data-die="${die.id}" aria-pressed="false">
+        <span class="die-btn__icon">${die.icon}</span>
+        <span class="die-btn__label">${die.label}</span>
+        <span class="die-btn__faces">1–${die.faces}</span>
+      </button>
+    `).join('');
+
+    diceGrid.querySelectorAll('.die-btn').forEach(btn => {
+      btn.addEventListener('click', () => selectDie(btn.dataset.die));
+    });
+  }
+
+  /* ---------- Выбор кубика ---------- */
+  function selectDie(id) {
+    if (rolling) return;
+    selectedDie = DICE.find(d => d.id === id) || null;
+
+    diceGrid.querySelectorAll('.die-btn').forEach(btn => {
+      const isActive = btn.dataset.die === id;
+      btn.classList.toggle('active', isActive);
+      btn.setAttribute('aria-pressed', String(isActive));
+    });
+
+    if (selectedDie) {
+      rollHint.textContent = `Выбран ${selectedDie.label} (${selectedDie.faces} граней)`;
+      rollBtn.disabled = false;
+      rollResult.textContent = '—';
+      rollResult.className = 'roll-result';
+      rollDetail.textContent = '';
+    } else {
+      rollHint.textContent = 'Выбери кубик выше';
+      rollBtn.disabled = true;
+    }
+  }
+
+  /* ---------- Бросок ---------- */
+  function rollDie() {
+    if (!selectedDie || rolling) return;
+    rolling = true;
+    rollBtn.disabled = true;
+
+    rollResult.className = 'roll-result rolling';
+    rollDetail.textContent = '';
+    rollHint.textContent = `Бросаем ${selectedDie.label}…`;
+
+    // Анимация: быстро меняем числа
+    const faces = selectedDie.faces;
+    const min = 1;
+    const finalValue = cryptoRandomInt(min, faces);
+
+    const animDuration = 900;
+    const start = performance.now();
+
+    function animate(now) {
+      const elapsed = now - start;
+      if (elapsed < animDuration) {
+        const fake = cryptoRandomInt(min, faces);
+        rollResult.textContent = fake;
+        requestAnimationFrame(animate);
+      } else {
+        finishRoll(finalValue);
+      }
+    }
+    requestAnimationFrame(animate);
+  }
+
+  function finishRoll(value) {
+    const die = selectedDie;
+    const isCrit = die.faces >= 20 && value === die.faces;   // крит только для d20+
+    const isFail = die.faces >= 20 && value === 1;           // провал только для d20+
+
+    rollResult.className = 'roll-result';
+    if (isCrit) rollResult.classList.add('crit');
+    if (isFail) rollResult.classList.add('fail');
+    rollResult.textContent = value;
+
+    rollHint.textContent = `Результат броска ${die.label}`;
+
+    if (isCrit) {
+      rollDetail.innerHTML = '🎉 <b>Критический успех!</b>';
+    } else if (isFail) {
+      rollDetail.innerHTML = '💀 <b>Критический провал…</b>';
+    } else {
+      rollDetail.innerHTML = `Выпало <b>${value}</b> из ${die.faces}`;
+    }
+
+    // Добавляем в историю
+    addToHistory(die, value, isCrit, isFail);
+
+    rolling = false;
+    rollBtn.disabled = false;
+  }
+
+  /* ---------- Криптослучайное целое [min, max] ---------- */
+  function cryptoRandomInt(min, max) {
+    const range = max - min + 1;
+    if (range <= 0) return min;
+
+    // rejection sampling для равномерности
+    const maxUint = 0xFFFFFFFF;
+    const limit = maxUint - (maxUint % range);
+    const buf = new Uint32Array(1);
+    let x;
+    do {
+      crypto.getRandomValues(buf);
+      x = buf[0];
+    } while (x >= limit);
+
+    return min + (x % range);
+  }
+
+  /* ---------- История ---------- */
+  function addToHistory(die, value, isCrit, isFail) {
+    const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    history.unshift({ die: die.label, value, isCrit, isFail, time });
+    if (history.length > 30) history.pop();
+    renderHistory();
+  }
+
+  function renderHistory() {
+    if (history.length === 0) {
+      historyList.innerHTML = '<div class="history__empty">Пока пусто</div>';
+      return;
+    }
+
+    historyList.innerHTML = history.map(item => {
+      const cls = item.isCrit ? 'crit' : item.isFail ? 'fail' : '';
+      return `
+        <div class="history__item">
+          <span class="history__die">${item.die}</span>
+          <span class="history__value ${cls}">${item.value}</span>
+          <span class="history__time">${item.time}</span>
+        </div>`;
+    }).join('');
+  }
+
+  /* ---------- Сброс истории ---------- */
+  clearBtn.addEventListener('click', () => {
+    history.length = 0;
+    renderHistory();
+  });
+
+  /* ---------- Бросок по кнопке и Enter ---------- */
+  rollBtn.addEventListener('click', rollDie);
+
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && !rolling && selectedDie) {
+      // не мешаем, если фокус на кнопке
+      if (document.activeElement === rollBtn) return;
+      e.preventDefault();
+      rollDie();
+    }
+  });
+
+  /* ---------- Инициализация ---------- */
+  renderDiceButtons();
+  renderHistory();
+</script>
+</body>
+</html>
